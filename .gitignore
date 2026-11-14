@@ -1,0 +1,9 @@
+.terraform/
+.terragrunt-cache/
+*.tfstate
+*.tfstate.*
+*.tfplan
+/tfplan/
+plan.txt
+crash.log
+.DS_Store
