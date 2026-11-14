@@ -1,0 +1,97 @@
+name: terragrunt-apply
+
+# После merge в main: plan (terraform-plan) → ручное подтверждение
+# в environment "production" → apply (terraform-apply).
+# terraform-apply выдаётся только токенам из refs/heads/main — это проверяет GCP.
+# Apply применяет ровно тот план, что показан в Summary: файлы плана
+# передаются между job'ами артефактом. Если стейт успел измениться,
+# terraform откажется применять устаревший план — нужен новый запуск.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "root.hcl"
+      - "mise.toml"
+      - "databases/**"
+      - "!databases/module-0/**"
+      - ".github/workflows/apply.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+# Один apply за раз, очередь не отменяется
+concurrency:
+  group: terragrunt-apply
+  cancel-in-progress: false
+
+env:
+  TG_NON_INTERACTIVE: "true"
+  TG_NO_COLOR: "true"
+  TF_IN_AUTOMATION: "true"
+  TF_INPUT: "0"
+  TF_CLI_ARGS_plan: "-no-color"
+  TF_CLI_ARGS_apply: "-no-color"
+  # Сюда terragrunt кладёт файлы плана, по подпапке на юнит
+  TG_OUT_DIR: ${{ github.workspace }}/tfplan
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to GCP (terraform-plan)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SA_PLAN }}
+
+      - uses: jdx/mise-action@v2
+
+      - name: Plan
+        run: |
+          set -o pipefail
+          terragrunt run --all plan 2>&1 | tee plan.txt
+          {
+            echo "## terragrunt plan"
+            echo '```'
+            tail -c 60000 plan.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # В плане могут быть секреты в открытом виде — храним недолго
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tfplan
+          path: ${{ env.TG_OUT_DIR }}
+          retention-days: 1
+          if-no-files-found: error
+
+  apply:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Required reviewers настраиваются в Settings → Environments → production
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to GCP (terraform-apply)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SA_APPLY }}
+
+      - uses: jdx/mise-action@v2
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: tfplan
+          path: ${{ env.TG_OUT_DIR }}
+
+      - name: Apply
+        run: terragrunt run --all apply
