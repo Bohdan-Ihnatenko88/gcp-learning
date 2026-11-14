@@ -1,0 +1,81 @@
+name: terragrunt-plan
+
+# Plan на каждый PR в main. Только чтение: SA terraform-plan.
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "root.hcl"
+      - "mise.toml"
+      - "databases/**"
+      - "!databases/module-0/**" # админские стадии, CI их не применяет
+      - ".github/workflows/plan.yml"
+
+permissions:
+  contents: read
+  id-token: write # OIDC-токен для входа в GCP через WIF
+  pull-requests: write # комментарий с планом
+
+concurrency:
+  group: plan-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  TG_NON_INTERACTIVE: "true"
+  TG_NO_COLOR: "true"
+  TF_IN_AUTOMATION: "true"
+  TF_INPUT: "0"
+  TF_CLI_ARGS_plan: "-no-color"
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to GCP (terraform-plan)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SA_PLAN }}
+
+      - uses: jdx/mise-action@v2
+
+      - name: Plan
+        id: plan
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          terragrunt run --all plan 2>&1 | tee plan.txt
+
+      - name: Comment plan on PR
+        if: always()
+        uses: actions/github-script@v7
+        env:
+          OUTCOME: ${{ steps.plan.outcome }}
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- terragrunt-plan -->';
+            let out = fs.existsSync('plan.txt') ? fs.readFileSync('plan.txt', 'utf8') : 'plan.txt not found';
+            const max = 60000;
+            if (out.length > max) out = '…(обрезано)\n' + out.slice(-max);
+
+            const icon = process.env.OUTCOME === 'success' ? '✅' : '❌';
+            const body = `${marker}\n### ${icon} terragrunt plan\n\n<details><summary>Вывод</summary>\n\n\`\`\`\n${out}\n\`\`\`\n</details>\n\n_${context.payload.pull_request.head.sha.slice(0, 7)}_`;
+
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number });
+            const prev = comments.find(c => c.body.includes(marker));
+            if (prev) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: prev.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body });
+            }
+
+      - name: Fail if plan failed
+        if: steps.plan.outcome == 'failure'
+        run: exit 1
