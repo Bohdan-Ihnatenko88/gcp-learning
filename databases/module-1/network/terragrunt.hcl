@@ -3,7 +3,7 @@ include "root" {
 }
 
 terraform {
-  source = "tfr:///terraform-google-modules/network/google?version=18.3.1"
+  source = "${get_repo_root()}/modules/network"
 }
 
 # Только порядок: сначала включаются API
@@ -13,14 +13,6 @@ dependencies {
 
 inputs = {
   network_name = "learning-vpc"
-  routing_mode = "REGIONAL"
-
-  subnets = [
-    {
-      subnet_name           = "learning-europe-west2"
-      subnet_ip             = "10.10.0.0/24"
-      subnet_region         = "europe-west2"
-      subnet_private_access = "true" # доступ к Google API без внешнего IP
-    },
-  ]
+  subnet_name  = "learning-europe-west2"
+  subnet_cidr  = "10.10.0.0/24"
 }
