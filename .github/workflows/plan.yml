@@ -9,6 +9,7 @@ on:
       - "root.hcl"
       - "mise.toml"
       - "databases/**"
+      - "modules/**"
       - "!databases/module-0/**" # админские стадии, CI их не применяет
       - ".github/workflows/plan.yml"
 

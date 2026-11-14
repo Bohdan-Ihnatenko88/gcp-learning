@@ -8,6 +8,7 @@
 |---|---|---|
 | `databases/module-0/` | Проект, billing, бюджет, SA, WIF (чистый terraform) | Админ локально, один раз |
 | `databases/module-1+/` | Стеки курса (terragrunt) | CI; локально — через impersonation |
+| `modules/` | Terraform-код, на который ссылаются стеки (`source` в `terragrunt.hcl`) | — |
 | `root.hcl` | Провайдер google, бэкенд GCS | — |
 | `.github/workflows/` | `plan.yml` на PR, `apply.yml` после merge | — |
 

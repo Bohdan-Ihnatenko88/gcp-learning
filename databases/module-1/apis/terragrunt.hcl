@@ -3,15 +3,12 @@ include "root" {
 }
 
 terraform {
-  source = "tfr:///terraform-google-modules/project-factory/google//modules/project_services?version=18.4.0"
+  source = "${get_repo_root()}/modules/apis"
 }
 
 inputs = {
-  activate_apis = [
+  apis = [
     "compute.googleapis.com",
     "servicenetworking.googleapis.com", # Private Service Access для баз
   ]
-
-  # Выключение API при destroy ломает всё, что от него зависит
-  disable_services_on_destroy = false
 }
