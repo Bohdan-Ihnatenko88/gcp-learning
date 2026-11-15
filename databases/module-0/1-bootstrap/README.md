@@ -11,7 +11,7 @@ impersonation для людей. Применяется админом один 
 | Кто | Как входит | От чьего имени | Права |
 |---|---|---|---|
 | CI на PR | WIF, любой ref репозитория | `terraform-plan` | Чтение |
-| CI после merge | WIF, только `refs/heads/<apply_branch>` | `terraform-apply` | Изменения |
+| CI после merge | WIF, только джобы в GitHub environment `<apply_environment>` | `terraform-apply` | Изменения |
 | Человек: plan | `gcloud` ADC + impersonation | `terraform-plan` | Чтение |
 | Человек: apply | `gcloud` ADC + impersonation | `terraform-apply` | Изменения |
 | Админ: bootstrap | `gcloud` ADC, личные права owner | Сам | Всё |
@@ -82,5 +82,7 @@ steps:
       service_account: ${{ vars.GCP_SA_PLAN }}   # в apply-джобе — GCP_SA_APPLY
 ```
 
-Если apply-джоба запустится не из `apply_branch`, GCP откажет в выдаче токена: проверка
-идёт на стороне GCP, а не в YAML воркфлоу.
+Apply SA выдаётся только джобе с `environment: <apply_environment>`: у неё `sub` в OIDC-токене
+`repo:<owner>/<repo>:environment:<name>`. Любая другая джоба, даже из `main`, получит 403.
+Required reviewers и ограничение веток (Deployment branches → `main`) задаются в настройках
+environment на GitHub.

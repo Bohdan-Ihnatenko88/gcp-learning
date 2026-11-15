@@ -14,10 +14,10 @@ variable "repo" {
   type        = string
 }
 
-variable "apply_branch" {
-  description = "Ветка, из которой CI может делать apply"
+variable "apply_environment" {
+  description = "GitHub environment, джобам которого выдаётся terraform-apply. Имя — точно как в Settings → Environments"
   type        = string
-  default     = "main"
+  default     = "Production"
 }
 
 variable "plan_impersonators" {

@@ -18,8 +18,6 @@ resource "google_iam_workload_identity_pool_provider" "github" {
     "google.subject"       = "assertion.sub"
     "attribute.repository" = "assertion.repository"
     "attribute.ref"        = "assertion.ref"
-    # repo + ветка в одном атрибуте, чтобы выдать apply только основной ветке
-    "attribute.repo_ref" = "assertion.repository + '@' + assertion.ref"
   }
 
   # Токены из других репозиториев отбрасываются ещё до проверки IAM
@@ -31,7 +29,8 @@ resource "google_iam_workload_identity_pool_provider" "github" {
 }
 
 locals {
-  wif_pool = "principalSet://iam.googleapis.com/${google_iam_workload_identity_pool.github.name}"
+  wif_pool    = "principalSet://iam.googleapis.com/${google_iam_workload_identity_pool.github.name}"
+  wif_subject = "principal://iam.googleapis.com/${google_iam_workload_identity_pool.github.name}/subject"
 }
 
 # plan — любой ref репозитория (PR из веток)
@@ -41,9 +40,11 @@ resource "google_service_account_iam_member" "plan_wif" {
   member             = "${local.wif_pool}/attribute.repository/${var.repo}"
 }
 
-# apply — только основная ветка
+# apply — только джобы в GitHub environment (там required reviewers и
+# ограничение веток). У такой джобы sub = repo:<owner>/<repo>:environment:<name>;
+# любая другая джоба, даже из main, apply SA не получит
 resource "google_service_account_iam_member" "apply_wif" {
   service_account_id = google_service_account.apply.name
   role               = "roles/iam.workloadIdentityUser"
-  member             = "${local.wif_pool}/attribute.repo_ref/${var.repo}@refs/heads/${var.apply_branch}"
+  member             = "${local.wif_subject}/repo:${var.repo}:environment:${var.apply_environment}"
 }
