@@ -1,7 +1,7 @@
 project      = "gcp-learning-xxxx"
 repo         = "your-login/gcp-learning"
 region       = "europe-west2"
-apply_branch = "main"
+apply_environment = "Production"
 
 # В проде здесь группы: group:infra-devs@… и group:infra-admins@…
 plan_impersonators  = ["user:you@example.com"]

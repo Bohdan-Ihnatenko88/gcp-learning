@@ -3,6 +3,8 @@
 [tools]
 terraform  = "1.15.8"
 terragrunt = "1.1.6"
+tflint     = "0.66.0"
+trivy      = "0.76.2"
 
 [env]
 TG_NON_INTERACTIVE = "true"
@@ -21,5 +23,15 @@ env = { GOOGLE_IMPERSONATE_SERVICE_ACCOUNT = "terraform-apply@gcp-learning-bohda
 run = "terragrunt run --all apply"
 
 [tasks.format]
-description = "Форматирование HCL и terraform"
-run = "terragrunt hcl format && terraform fmt -recursive databases"
+description = "Форматирование HCL и terraform по всему репозиторию"
+run = "terragrunt hcl format && terraform fmt -recursive"
+
+[tasks.lint]
+description = "Те же проверки, что в lint.yml: fmt, tflint, trivy"
+run = [
+  "terraform fmt -check -recursive -diff",
+  "terragrunt hcl format --check --diff",
+  "tflint --init --config {{config_root}}/.tflint.hcl",
+  "tflint --recursive --config {{config_root}}/.tflint.hcl --format compact",
+  "trivy config --exit-code 1 --severity HIGH,CRITICAL --ignorefile .trivyignore .",
+]
