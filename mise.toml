@@ -1,8 +1,8 @@
 # Same versions locally and in CI: state written by a newer terraform
 # cannot be read by an older one
 [tools]
-terraform  = "1.15.8"
-terragrunt = "1.1.6"
+terraform  = "1.17.2"
+terragrunt = "1.2.2"
 tflint     = "0.66.0"
 trivy      = "0.76.2"
 
