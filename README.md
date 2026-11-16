@@ -15,7 +15,7 @@ service account impersonation.
 | `root.hcl` | Shared google provider and GCS backend | - |
 | `mise.toml` | Pinned tool versions and tasks (`plan`, `apply`, `lint`, `format`) | - |
 | `.github/workflows/` | `lint.yml` and `plan.yml` on PRs, `apply.yml` after merge | - |
-| `.github/dependabot.yml` | Weekly updates for SHA-pinned actions | - |
+| `renovate.json` | Weekly update PRs: providers, lock files, SHA-pinned actions, mise tools | - |
 
 ## How a change is applied
 
@@ -109,6 +109,7 @@ Set `project` and `region` in [root.hcl](root.hcl) and the SA emails in [mise.to
 | Settings -> Actions -> General | Workflow permissions: read-only; require approval for fork PRs |
 | Settings -> General -> Pull Requests | Squash merge only; automatically delete head branches |
 | Settings -> Advanced Security | Secret scanning with push protection; Dependabot alerts |
+| [Renovate GitHub App](https://github.com/apps/renovate) | Installed for this repository only |
 
 The environment name must match `apply_environment` in `1-bootstrap`: GCP issues the apply SA
 token only to jobs in that environment.
