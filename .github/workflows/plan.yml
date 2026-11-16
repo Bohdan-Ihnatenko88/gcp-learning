@@ -1,6 +1,6 @@
 name: terragrunt-plan
 
-# Plan на каждый PR в main. Только чтение: SA terraform-plan.
+# Plan on every PR to main. Read-only: terraform-plan SA.
 
 on:
   pull_request:
@@ -10,13 +10,13 @@ on:
       - "mise.toml"
       - "databases/**"
       - "modules/**"
-      - "!databases/module-0/**" # админские стадии, CI их не применяет
+      - "!databases/module-0/**" # admin stages, not run by CI
       - ".github/workflows/plan.yml"
 
 permissions:
   contents: read
-  id-token: write # OIDC-токен для входа в GCP через WIF
-  pull-requests: write # комментарий с планом
+  id-token: write # OIDC token to sign in to GCP via WIF
+  pull-requests: write # PR comment with the plan
 
 concurrency:
   group: plan-${{ github.event.pull_request.number }}
@@ -44,7 +44,7 @@ jobs:
 
       - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac # v2.4.4
         with:
-          install_args: terraform terragrunt # линтеры здесь не нужны
+          install_args: terraform terragrunt # linters are not needed here
 
       - name: Plan
         id: plan
@@ -64,10 +64,10 @@ jobs:
             const marker = '<!-- terragrunt-plan -->';
             let out = fs.existsSync('plan.txt') ? fs.readFileSync('plan.txt', 'utf8') : 'plan.txt not found';
             const max = 60000;
-            if (out.length > max) out = '…(обрезано)\n' + out.slice(-max);
+            if (out.length > max) out = '…(truncated)\n' + out.slice(-max);
 
             const icon = process.env.OUTCOME === 'success' ? '✅' : '❌';
-            const body = `${marker}\n### ${icon} terragrunt plan\n\n<details><summary>Вывод</summary>\n\n\`\`\`\n${out}\n\`\`\`\n</details>\n\n_${context.payload.pull_request.head.sha.slice(0, 7)}_`;
+            const body = `${marker}\n### ${icon} terragrunt plan\n\n<details><summary>Output</summary>\n\n\`\`\`\n${out}\n\`\`\`\n</details>\n\n_${context.payload.pull_request.head.sha.slice(0, 7)}_`;
 
             const { owner, repo } = context.repo;
             const issue_number = context.issue.number;

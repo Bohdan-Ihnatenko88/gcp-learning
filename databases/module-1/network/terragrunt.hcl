@@ -6,7 +6,7 @@ terraform {
   source = "${get_repo_root()}/modules/network"
 }
 
-# Только порядок: сначала включаются API
+# Ordering only: APIs are enabled first
 dependencies {
   paths = ["../apis"]
 }

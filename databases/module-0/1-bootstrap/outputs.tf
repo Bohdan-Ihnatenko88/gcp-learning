@@ -1,4 +1,4 @@
-# Первые три значения кладутся в GitHub: Settings → Variables → Actions
+# The first three values go to GitHub: Settings -> Secrets and variables -> Actions -> Variables
 
 output "GCP_WORKLOAD_IDENTITY_PROVIDER" {
   value = google_iam_workload_identity_pool_provider.github.name

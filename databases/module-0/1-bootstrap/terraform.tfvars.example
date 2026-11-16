@@ -3,10 +3,10 @@ repo         = "your-login/gcp-learning"
 region       = "europe-west2"
 apply_environment = "Production"
 
-# В проде здесь группы: group:infra-devs@… и group:infra-admins@…
+# In production these are groups: group:infra-devs@... and group:infra-admins@...
 plan_impersonators  = ["user:you@example.com"]
 apply_impersonators = ["user:you@example.com"]
 
-# В организации запрет ключей уже наследуется от org policy (проверка:
-# gcloud resource-manager org-policies list --organization=<org_id>), поэтому false
+# Inside an organization the key ban is already inherited from org policy (check:
+# gcloud resource-manager org-policies list --organization=<org_id>), so false
 enforce_no_sa_keys = false

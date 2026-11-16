@@ -1,11 +1,11 @@
 name: terragrunt-apply
 
-# После merge в main: plan (terraform-plan) → ручное подтверждение
-# в environment "Production" → apply (terraform-apply).
-# terraform-apply выдаётся только джобам в environment Production — это проверяет GCP.
-# Apply применяет ровно тот план, что показан в Summary: файлы плана
-# передаются между job'ами артефактом. Если стейт успел измениться,
-# terraform откажется применять устаревший план — нужен новый запуск.
+# After merge to main: plan (terraform-plan) -> manual approval
+# in the "Production" environment -> apply (terraform-apply).
+# GCP grants terraform-apply only to jobs running in the Production environment.
+# Apply uses exactly the plan shown in the Summary: plan files are passed
+# between jobs as an artifact. If the state changed in the meantime,
+# terraform refuses the stale plan and a new run is needed.
 
 on:
   push:
@@ -23,7 +23,7 @@ permissions:
   contents: read
   id-token: write
 
-# Один apply за раз, очередь не отменяется
+# One apply at a time; queued runs are not cancelled
 concurrency:
   group: terragrunt-apply
   cancel-in-progress: false
@@ -35,7 +35,7 @@ env:
   TF_INPUT: "0"
   TF_CLI_ARGS_plan: "-no-color"
   TF_CLI_ARGS_apply: "-no-color"
-  # Сюда terragrunt кладёт файлы плана, по подпапке на юнит
+  # terragrunt writes plan files here, one subfolder per unit
   TG_OUT_DIR: ${{ github.workspace }}/tfplan
 
 jobs:
@@ -53,7 +53,7 @@ jobs:
 
       - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac # v2.4.4
         with:
-          install_args: terraform terragrunt # линтеры здесь не нужны
+          install_args: terraform terragrunt # linters are not needed here
 
       - name: Plan
         run: |
@@ -66,7 +66,7 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
-      # В плане могут быть секреты в открытом виде — храним недолго
+      # Plans may contain plaintext secrets, so keep them briefly
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: tfplan
@@ -78,7 +78,7 @@ jobs:
     needs: plan
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # Required reviewers настраиваются в Settings → Environments → production
+    # Required reviewers: Settings -> Environments -> Production
     environment: Production
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -91,7 +91,7 @@ jobs:
 
       - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac # v2.4.4
         with:
-          install_args: terraform terragrunt # линтеры здесь не нужны
+          install_args: terraform terragrunt # linters are not needed here
 
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:

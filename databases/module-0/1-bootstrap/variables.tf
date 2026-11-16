@@ -1,55 +1,55 @@
 variable "project" {
-  description = "ID GCP-проекта"
+  description = "GCP project ID"
   type        = string
 }
 
 variable "region" {
-  description = "Регион для бакета и ресурсов по умолчанию"
+  description = "Region for the state bucket and default resources"
   type        = string
   default     = "europe-west2"
 }
 
 variable "repo" {
-  description = "GitHub-репозиторий, которому разрешён вход в GCP: owner/name"
+  description = "GitHub repository allowed to sign in to GCP: owner/name"
   type        = string
 }
 
 variable "apply_environment" {
-  description = "GitHub environment, джобам которого выдаётся terraform-apply. Имя — точно как в Settings → Environments"
+  description = "GitHub environment whose jobs get terraform-apply. Name exactly as in Settings -> Environments"
   type        = string
   default     = "Production"
 }
 
 variable "plan_impersonators" {
-  description = "Кто может действовать от имени terraform-plan: user:… / group:…"
+  description = "Who can impersonate terraform-plan: user:... / group:..."
   type        = list(string)
   default     = []
 }
 
 variable "apply_impersonators" {
-  description = "Кто может действовать от имени terraform-apply. В проде — группа админов"
+  description = "Who can impersonate terraform-apply. In production, an admin group"
   type        = list(string)
   default     = []
 }
 
 variable "plan_roles" {
-  description = "Роли terraform-plan на проект: только чтение"
+  description = "terraform-plan project roles: read-only"
   type        = list(string)
   default = [
     "roles/viewer",
-    "roles/iam.securityReviewer", # чтение IAM-политик для plan по IAM-ресурсам
-    # Если в стеке есть google_secret_manager_secret_version, plan читает значение —
-    # тогда нужен roles/secretmanager.secretAccessor
+    "roles/iam.securityReviewer", # read IAM policies to plan IAM resources
+    # If a stack has google_secret_manager_secret_version, plan reads the value,
+    # so roles/secretmanager.secretAccessor is needed
   ]
 }
 
 variable "apply_roles" {
-  description = "Роли terraform-apply на проект: только то, что нужно стекам курса"
+  description = "terraform-apply project roles: only what the course stacks need"
   type        = list(string)
   default = [
-    "roles/serviceusage.serviceUsageAdmin",  # включение API
-    "roles/compute.networkAdmin",            # VPC, подсети, firewall, адреса, router, NAT
-    "roles/compute.instanceAdmin.v1",        # VM для подключения к базам
+    "roles/serviceusage.serviceUsageAdmin",  # enable APIs
+    "roles/compute.networkAdmin",            # VPC, subnets, firewall, addresses, router, NAT
+    "roles/compute.instanceAdmin.v1",        # VMs to connect to databases
     "roles/servicenetworking.networksAdmin", # Private Service Access
     "roles/cloudsql.admin",                  # Cloud SQL
     "roles/alloydb.admin",                   # AlloyDB
@@ -57,17 +57,17 @@ variable "apply_roles" {
     "roles/memcache.admin",                  # Memorystore Memcached
     "roles/spanner.admin",                   # Spanner
     "roles/datastore.owner",                 # Firestore
-    "roles/secretmanager.admin",             # секреты с паролями баз
-    "roles/storage.admin",                   # бакеты
-    "roles/iam.serviceAccountAdmin",         # SA для приложений
-    "roles/iam.serviceAccountUser",          # привязка SA к VM и сервисам
-    # Намеренно нет roles/resourcemanager.projectIamAdmin: с ним SA может выдать
-    # себе любые права. Привязки ролей на проект делает bootstrap / админ.
+    "roles/secretmanager.admin",             # secrets with database passwords
+    "roles/storage.admin",                   # buckets
+    "roles/iam.serviceAccountAdmin",         # SAs for applications
+    "roles/iam.serviceAccountUser",          # attach SAs to VMs and services
+    # No roles/resourcemanager.projectIamAdmin on purpose: with it the SA could grant
+    # itself any role. Project role bindings are managed by bootstrap / an admin.
   ]
 }
 
 variable "enforce_no_sa_keys" {
-  description = "Запретить JSON-ключи SA через Org Policy. Требует организацию"
+  description = "Block SA JSON keys via Org Policy. Requires an organization"
   type        = bool
   default     = false
 }

@@ -1,5 +1,5 @@
-# После apply стадии 1-bootstrap бакет стейта уже есть: переименуйте в backend.tf,
-# подставьте имя бакета и выполните `terraform init -migrate-state`.
+# State lives in the bucket created by 1-bootstrap (migrated with
+# `terraform init -migrate-state` after the first bootstrap apply).
 
 terraform {
   backend "gcs" {

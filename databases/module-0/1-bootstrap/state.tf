@@ -4,12 +4,12 @@ resource "google_storage_bucket" "tfstate" {
   uniform_bucket_level_access = true
   public_access_prevention    = "enforced"
 
-  # Версии объектов: можно откатить испорченный стейт
+  # Object versioning: a broken state can be rolled back
   versioning {
     enabled = true
   }
 
-  # Старые версии стейта храним 30 дней
+  # Keep old state versions for 30 days
   lifecycle_rule {
     condition {
       days_since_noncurrent_time = 30
@@ -22,7 +22,7 @@ resource "google_storage_bucket" "tfstate" {
   depends_on = [google_project_service.apis]
 }
 
-# plan тоже пишет в бакет: GCS-бэкенд создаёт lock-файл
+# plan also writes to the bucket: the GCS backend creates a lock file
 resource "google_storage_bucket_iam_member" "tfstate" {
   for_each = {
     plan  = google_service_account.plan.email

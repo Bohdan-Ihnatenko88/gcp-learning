@@ -1,7 +1,7 @@
-# Два сервисных аккаунта Terraform. Ими пользуются и CI (через WIF), и люди
-# (через impersonation), поэтому права локально и в CI одинаковые.
-#   terraform-plan  — только чтение, для plan на любых PR
-#   terraform-apply — изменения, только из основной ветки или у админов
+# Two Terraform service accounts, used by CI (via WIF) and by people
+# (via impersonation), so permissions are the same locally and in CI.
+#   terraform-plan  - read-only, for plan on any PR
+#   terraform-apply - changes; only Production environment jobs or admins
 
 resource "google_service_account" "plan" {
   account_id   = "terraform-plan"
@@ -17,7 +17,7 @@ resource "google_service_account" "apply" {
   depends_on = [google_project_service.apis]
 }
 
-# --- Роли на проект -----------------------------------------------------
+# --- Project roles ------------------------------------------------------
 
 resource "google_project_iam_member" "plan" {
   for_each = toset(var.plan_roles)
@@ -35,9 +35,9 @@ resource "google_project_iam_member" "apply" {
   member  = "serviceAccount:${google_service_account.apply.email}"
 }
 
-# --- Impersonation для людей ------------------------------------------
-# Человек логинится в gcloud под своим аккаунтом, а Terraform обменивает его
-# токен на часовой токен SA. Прямых прав на проект у человека нет.
+# --- Impersonation for people -----------------------------------------
+# A person signs in to gcloud with their own account and Terraform exchanges
+# that token for a one-hour SA token. The person has no direct project roles.
 
 resource "google_service_account_iam_member" "plan_impersonators" {
   for_each = toset(var.plan_impersonators)

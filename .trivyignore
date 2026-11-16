@@ -1,5 +1,5 @@
-# Принятые риски для trivy config. Каждая строка — ID проверки и причина.
-# В проде сюда добавляют только с обоснованием и ссылкой на решение.
+# Accepted risks for trivy config. One line per check ID, with a reason.
+# In production, add entries only with a justification and a link to the decision.
 #
-# Пример:
-# AVD-GCP-0029  # flow logs в учебной сети не нужны, платные
+# Example:
+# AVD-GCP-0029  # flow logs are not needed in the learning network and cost money

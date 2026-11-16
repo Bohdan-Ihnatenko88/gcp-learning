@@ -1,5 +1,5 @@
-# Одни и те же версии локально и в CI: стейт, записанный новой версией
-# terraform, старая прочитать не сможет
+# Same versions locally and in CI: state written by a newer terraform
+# cannot be read by an older one
 [tools]
 terraform  = "1.15.8"
 terragrunt = "1.1.6"
@@ -8,26 +8,31 @@ trivy      = "0.76.2"
 
 [env]
 TG_NON_INTERACTIVE = "true"
+# Separate gcloud config dir (accounts, ADC) for this repo, so signing in here
+# does not overwrite credentials of other projects. Active when mise is
+# activated in the shell or via `mise run` / `mise exec`. In CI it is unused:
+# google-github-actions/auth sets GOOGLE_APPLICATION_CREDENTIALS, which wins.
+CLOUDSDK_CONFIG = "{{env.HOME}}/.config/gcloud-gcp-learning"
 
-# Локальный запуск — через impersonation, с теми же правами, что у CI.
-# В CI эти задачи не используются: там SA выдаёт google-github-actions/auth
+# Local runs use impersonation, with the same permissions as CI.
+# CI does not use these tasks: there the SA comes from google-github-actions/auth
 
 [tasks.plan]
-description = "terragrunt plan по всем стекам от имени terraform-plan"
+description = "terragrunt plan for all stacks as terraform-plan"
 env = { GOOGLE_IMPERSONATE_SERVICE_ACCOUNT = "terraform-plan@gcp-learning-bohdan88.iam.gserviceaccount.com" }
 run = "terragrunt run --all plan"
 
 [tasks.apply]
-description = "terragrunt apply по всем стекам от имени terraform-apply"
+description = "terragrunt apply for all stacks as terraform-apply"
 env = { GOOGLE_IMPERSONATE_SERVICE_ACCOUNT = "terraform-apply@gcp-learning-bohdan88.iam.gserviceaccount.com" }
 run = "terragrunt run --all apply"
 
 [tasks.format]
-description = "Форматирование HCL и terraform по всему репозиторию"
+description = "Format HCL and terraform across the repo"
 run = "terragrunt hcl format && terraform fmt -recursive"
 
 [tasks.lint]
-description = "Те же проверки, что в lint.yml: fmt, tflint, trivy"
+description = "Same checks as lint.yml: fmt, tflint, trivy"
 run = [
   "terraform fmt -check -recursive -diff",
   "terragrunt hcl format --check --diff",
