@@ -9,13 +9,13 @@ terraform {
   }
 }
 
-# Создание проекта и включение API — от имени того, кто запускает (админ, ADC)
+# Project creation and API enablement run as the caller (admin, ADC)
 provider "google" {
   region = var.region
 }
 
-# Billing Budget API требует проект, на который «записываются» вызовы API.
-# Им становится новый проект — поэтому отдельный alias с user_project_override.
+# The Billing Budget API needs a quota project to bill the API calls to.
+# That is the new project, hence a separate alias with user_project_override.
 provider "google" {
   alias                 = "billing"
   user_project_override = true

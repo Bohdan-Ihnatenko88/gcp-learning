@@ -9,6 +9,6 @@ terraform {
 inputs = {
   apis = [
     "compute.googleapis.com",
-    "servicenetworking.googleapis.com", # Private Service Access для баз
+    "servicenetworking.googleapis.com", # Private Service Access for databases
   ]
 }

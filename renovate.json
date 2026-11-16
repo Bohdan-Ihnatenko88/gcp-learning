@@ -1,0 +1,30 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:best-practices"],
+  "schedule": ["before 6am on monday"],
+  "timezone": "Europe/Kyiv",
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": ["before 6am on monday"]
+  },
+  "packageRules": [
+    {
+      "description": "Providers: one PR for minor/patch across all folders, majors separately",
+      "matchManagers": ["terraform", "terragrunt"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "terraform providers"
+    },
+    {
+      "description": "SHA-pinned actions: one PR for minor/patch/digest updates",
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["minor", "patch", "digest"],
+      "groupName": "github actions"
+    },
+    {
+      "description": "Tool versions in mise.toml (terraform, terragrunt, tflint, trivy)",
+      "matchManagers": ["mise"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "mise tools"
+    }
+  ]
+}

@@ -3,6 +3,6 @@ variable "project_id" {
 }
 
 variable "apis" {
-  description = "API, которые включаются в проекте"
+  description = "APIs to enable in the project"
   type        = list(string)
 }

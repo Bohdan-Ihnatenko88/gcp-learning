@@ -1,88 +1,90 @@
 # bootstrap
 
-Фундамент проекта, без которого Terraform и CI не могут работать сами: бакет под стейт,
-сервисные аккаунты Terraform, Workload Identity Federation для GitHub Actions и
-impersonation для людей. Применяется админом один раз под личным аккаунтом.
+The foundation Terraform and CI need before they can run on their own: the state bucket,
+the Terraform service accounts, Workload Identity Federation for GitHub Actions and
+impersonation for people. Applied once by an admin with their own account.
 
-Стадия 1. Запускается после `../0-seed`, который создаёт сам проект, привязку billing и бюджет.
+Stage 1. Runs after `../0-seed`, which creates the project, the billing link and the budget.
 
-## Модель доступа
+## Access model
 
-| Кто | Как входит | От чьего имени | Права |
+| Who | Signs in with | Acts as | Permissions |
 |---|---|---|---|
-| CI на PR | WIF, любой ref репозитория | `terraform-plan` | Чтение |
-| CI после merge | WIF, только джобы в GitHub environment `<apply_environment>` | `terraform-apply` | Изменения |
-| Человек: plan | `gcloud` ADC + impersonation | `terraform-plan` | Чтение |
-| Человек: apply | `gcloud` ADC + impersonation | `terraform-apply` | Изменения |
-| Админ: bootstrap | `gcloud` ADC, личные права owner | Сам | Всё |
+| CI on a PR | WIF, any ref of the repository | `terraform-plan` | Read |
+| CI after merge | WIF, only jobs in the GitHub environment `<apply_environment>` | `terraform-apply` | Write |
+| Person: plan | `gcloud` ADC + impersonation | `terraform-plan` | Read |
+| Person: apply | `gcloud` ADC + impersonation | `terraform-apply` | Write |
+| Admin: bootstrap | `gcloud` ADC, own owner role | Themselves | Everything |
 
-Ключей сервисных аккаунтов нет нигде. Права у людей и CI одинаковые, потому что они
-пользуются одними и теми же SA. В Audit Logs видно, кто именно использовал SA.
+There are no service account keys. People and CI have the same permissions because they
+use the same SAs. Audit Logs show who used an SA.
 
-## Файлы
+## Files
 
-| Файл | Что внутри |
+| File | Contents |
 |---|---|
-| `apis.tf` | Включение API |
-| `state.tf` | Бакет стейта (версии, чистка через 30 дней) + доступ SA к нему |
-| `service_accounts.tf` | `terraform-plan`, `terraform-apply`, их роли, impersonation |
-| `wif.tf` | Пул и провайдер WIF, кто из GitHub может стать каким SA |
-| `org_policy.tf` | Запрет JSON-ключей (только если проект в организации) |
+| `apis.tf` | Enabled APIs |
+| `state.tf` | State bucket (versioning, 30-day cleanup of old versions) and SA access to it |
+| `service_accounts.tf` | `terraform-plan`, `terraform-apply`, their roles, impersonation |
+| `wif.tf` | WIF pool and provider, which GitHub jobs can become which SA |
+| `org_policy.tf` | Ban on JSON keys (only for a project in an organization) |
 
-У `terraform-apply` нет `roles/resourcemanager.projectIamAdmin`: иначе он мог бы выдать себе
-любые права. Роли на проект меняются только здесь, в bootstrap.
+`terraform-apply` has no `roles/resourcemanager.projectIamAdmin`, otherwise it could grant
+itself any role. Project roles change only here, in bootstrap.
 
-## Шаги
+## Steps
 
-1. Применить `../0-seed`.
-2. Указать новый проект как quota project для ADC (на него «записываются» вызовы API):
+1. Apply `../0-seed`.
+2. Set the new project as the ADC quota project (API calls are billed to it):
    ```bash
    gcloud auth application-default set-quota-project <project_id>
    ```
-3. `cp terraform.tfvars.example terraform.tfvars`, подставить `project` (= output `project_id` из 0-seed), `repo` и себя в `*_impersonators`.
-4. Применить с локальным стейтом:
+3. `cp terraform.tfvars.example terraform.tfvars`, set `project` (= `project_id` output of
+   0-seed), `repo`, `apply_environment` and yourself in `*_impersonators`.
+4. Apply with local state:
    ```bash
    terraform init
    terraform plan
    terraform apply
    ```
-5. Перенести стейт bootstrap в бакет:
+5. Move the bootstrap state to the bucket:
    ```bash
-   mv backend.tf.example backend.tf   # подставить имя бакета
+   cp backend.tf.example backend.tf   # set the bucket name
    terraform init -migrate-state
    rm terraform.tfstate terraform.tfstate.backup
    ```
-6. `terraform output` → в GitHub, Settings → Variables → Actions:
+6. Copy `terraform output` to GitHub, Settings -> Secrets and variables -> Actions -> Variables:
    `GCP_WORKLOAD_IDENTITY_PROVIDER`, `GCP_SA_PLAN`, `GCP_SA_APPLY`.
-7. В проде после этого у людей забирают личные широкие роли на проект. Остаётся owner у
-   небольшой break-glass группы для аварий и изменений bootstrap.
+7. Create the GitHub environment named exactly as `apply_environment`, with required
+   reviewers and deployment branches limited to protected branches.
+8. In production, people then lose their broad personal project roles. Owner stays with a
+   small break-glass group for emergencies and bootstrap changes.
 
-## Как дальше работают остальные стеки
+## How other stacks use it
 
-Провайдер `google` и GCS-бэкенд оба читают переменную `GOOGLE_IMPERSONATE_SERVICE_ACCOUNT`,
-поэтому в коде стеков SA не прописывается:
+The `google` provider and the GCS backend both read `GOOGLE_IMPERSONATE_SERVICE_ACCOUNT`,
+so stacks do not name an SA in code:
 
 ```bash
-gcloud auth application-default login            # один раз, под своим аккаунтом
+gcloud auth application-default login            # once, with your own account
 export GOOGLE_IMPERSONATE_SERVICE_ACCOUNT=terraform-plan@<project>.iam.gserviceaccount.com
 terragrunt plan
 ```
 
-Для apply — то же самое с `terraform-apply@…`.
+The same with `terraform-apply@...` for apply. `mise run plan` / `mise run apply` set it for you.
 
-В GitHub Actions:
+In GitHub Actions:
 
 ```yaml
 permissions:
-  id-token: write   # без этого GitHub не выдаст OIDC-токен
+  id-token: write   # GitHub issues no OIDC token without it
 steps:
-  - uses: google-github-actions/auth@v2
+  - uses: google-github-actions/auth@<sha> # v2
     with:
       workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-      service_account: ${{ vars.GCP_SA_PLAN }}   # в apply-джобе — GCP_SA_APPLY
+      service_account: ${{ vars.GCP_SA_PLAN }}   # GCP_SA_APPLY in the apply job
 ```
 
-Apply SA выдаётся только джобе с `environment: <apply_environment>`: у неё `sub` в OIDC-токене
-`repo:<owner>/<repo>:environment:<name>`. Любая другая джоба, даже из `main`, получит 403.
-Required reviewers и ограничение веток (Deployment branches → `main`) задаются в настройках
-environment на GitHub.
+The apply SA is granted only to a job with `environment: <apply_environment>`: its OIDC token
+has `sub = repo:<owner>/<repo>:environment:<name>`. Any other job, even on `main`, gets 403.
+Required reviewers and the branch restriction are configured on the GitHub environment.

@@ -1,7 +1,7 @@
 name: lint
 
-# Статические проверки на каждый PR, включая module-0. Без доступа к GCP.
-# Добавьте джобы этого воркфлоу в required checks ruleset protect-main.
+# Static checks on every PR, module-0 included. No GCP access.
+# The jobs of this workflow are required checks in the protect-main ruleset.
 
 on:
   pull_request:
@@ -42,7 +42,7 @@ jobs:
 
       - name: tflint
         env:
-          # Плагины качаются с GitHub: без токена упрёмся в rate limit
+          # Plugins are downloaded from GitHub; without a token we hit the rate limit
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           tflint --init --config "$GITHUB_WORKSPACE/.tflint.hcl"
@@ -56,5 +56,5 @@ jobs:
       - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac # v2.4.4
 
       - name: trivy config
-        # Падает на HIGH и CRITICAL. Принятые риски — в .trivyignore с причиной
+        # Fails on HIGH and CRITICAL. Accepted risks go to .trivyignore with a reason
         run: trivy config --exit-code 1 --severity HIGH,CRITICAL --ignorefile .trivyignore .

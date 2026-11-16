@@ -1,4 +1,4 @@
-# project_id передаётся в 1-bootstrap (переменная project)
+# project_id is passed to 1-bootstrap (variable project)
 
 output "project_id" {
   value = google_project.this.project_id

@@ -1,9 +1,9 @@
-# Общий конфиг для всех стеков, кроме databases/module-0 (там админские стадии
-# на чистом terraform, CI их не трогает).
+# Shared config for all stacks except databases/module-0 (admin stages in
+# plain terraform, not touched by CI).
 #
-# Учётные данные здесь не прописаны: провайдер и бэкенд берут их из окружения —
-# в CI от google-github-actions/auth, локально через
-# GOOGLE_IMPERSONATE_SERVICE_ACCOUNT (см. задачи в mise.toml).
+# No credentials here: the provider and backend take them from the environment,
+# in CI from google-github-actions/auth, locally via
+# GOOGLE_IMPERSONATE_SERVICE_ACCOUNT (see tasks in mise.toml).
 
 locals {
   project = "gcp-learning-bohdan88"
@@ -28,7 +28,7 @@ remote_state {
     bucket = "${local.project}-tfstate"
     prefix = "${path_relative_to_include()}"
 
-    # Бакет создан и настроен в module-0/1-bootstrap, terragrunt его не трогает
+    # The bucket is created and configured in module-0/1-bootstrap; terragrunt leaves it alone
     skip_bucket_creation   = true
     skip_bucket_versioning = true
   }

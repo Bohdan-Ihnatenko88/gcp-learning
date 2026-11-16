@@ -1,39 +1,30 @@
-# Модуль 0 — фундамент проекта
+# Module 0: project foundation
 
-Стадии применяются по порядку. Чем ниже стадия, тем шире права у того, кто её запускает,
-и тем реже её меняют.
+Stages are applied in order. The lower the stage, the broader the permissions of whoever
+runs it and the less often it changes. Step-by-step setup is in the [root README](../../README.md).
 
-| Стадия | Что создаёт | Кто запускает | Стейт |
+| Stage | Creates | Run by | State |
 |---|---|---|---|
-| `0-seed` | Проект, привязка billing, бюджет-алерт | Админ, личный ADC | GCS, prefix `0-seed` |
-| `1-bootstrap` | API, бакет стейта, SA `terraform-plan` / `terraform-apply`, WIF, impersonation | Админ, личный ADC | GCS, prefix `bootstrap` |
-| дальше (модули 1+) | Сеть, базы и т.д. | CI через WIF или человек через impersonation | GCS |
+| `0-seed` | Project, billing link, budget alert | Admin, own ADC | GCS, prefix `0-seed` |
+| `1-bootstrap` | APIs, state bucket, `terraform-plan` / `terraform-apply` SAs, WIF, impersonation | Admin, own ADC | GCS, prefix `bootstrap` |
+| module-1 and later | Network, databases, etc. | CI via WIF or a person via impersonation | GCS, prefix = stack path |
 
-Вручную делается только то, что нельзя автоматизировать: регистрация billing-аккаунта
-(free trial) и вход в `gcloud`.
+Only what cannot be automated is done by hand: signing up for a billing account
+(free trial) and signing in to `gcloud`.
 
-## Порядок
+CI does not plan or apply these stages (`plan.yml` and `apply.yml` exclude `module-0`),
+but `lint.yml` checks them on every PR.
+
+## Changing a stage
 
 ```bash
-# 0. Вход (один раз)
-gcloud auth login
-gcloud auth application-default login
-gcloud billing accounts list          # ID для 0-seed
-
-# 1. Проект
-cd 0-seed
-cp terraform.tfvars.example terraform.tfvars   # project_id, billing_account
-terraform init && terraform apply
-
-# 2. Доступы
-gcloud auth application-default set-quota-project <project_id>
-cd ../1-bootstrap
-cp terraform.tfvars.example terraform.tfvars   # project, repo, impersonators
-terraform init && terraform apply
-
-# 3. Перенос стейтов обеих стадий в созданный бакет
-mv backend.tf.example backend.tf && terraform init -migrate-state
-cd ../0-seed && mv backend.tf.example backend.tf && terraform init -migrate-state
+cd 1-bootstrap            # or 0-seed
+terraform init
+terraform plan
+terraform apply
 ```
 
-Подробности — в README каждой стадии.
+Both stages use your own credentials, not the Terraform SAs: bootstrap manages the roles
+of those SAs, so they must not be able to change it themselves.
+
+Details are in each stage's README.

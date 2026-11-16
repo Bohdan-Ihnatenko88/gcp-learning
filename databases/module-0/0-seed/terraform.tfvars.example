@@ -1,4 +1,4 @@
-project_id      = "gcp-learning-xxxx" # уникальный, допишите свои символы
+project_id      = "gcp-learning-xxxx" # globally unique, add your own suffix
 billing_account = "XXXXXX-XXXXXX-XXXXXX"
 org_id          = "000000000000" # gcloud organizations list
 budget_amount   = 50

@@ -1,5 +1,5 @@
-# Шаг 5 README: после первого apply переименуйте в backend.tf,
-# подставьте имя бакета и выполните `terraform init -migrate-state`.
+# State lives in the bucket created by this stage (migrated with
+# `terraform init -migrate-state` after the first apply).
 
 terraform {
   backend "gcs" {

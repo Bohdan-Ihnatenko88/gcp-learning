@@ -1,5 +1,5 @@
-# Стадия 0: проект, привязка billing, бюджет.
-# Запускает админ под личным аккаунтом. Остальное — в 1-bootstrap.
+# Stage 0: project, billing link, budget.
+# Run by an admin with their own account. Everything else is in 1-bootstrap.
 
 resource "google_project" "this" {
   project_id      = var.project_id
@@ -7,15 +7,15 @@ resource "google_project" "this" {
   billing_account = var.billing_account
   labels          = var.labels
 
-  # Родитель: папка или корень организации. Смена родителя переносит проект,
-  # а не пересоздаёт его
+  # Parent: a folder or the organization root. Changing the parent moves the
+  # project instead of recreating it
   org_id    = var.folder_id == null ? var.org_id : null
   folder_id = var.folder_id
 
-  # Без default VPC с открытыми firewall-правилами: сеть создаём сами
+  # No default VPC with open firewall rules: we create the network ourselves
   auto_create_network = false
 
-  # Защита от случайного terraform destroy всего проекта
+  # Protects the whole project from an accidental terraform destroy
   deletion_policy = "PREVENT"
 }
 
@@ -41,8 +41,8 @@ resource "google_billing_budget" "this" {
   budget_filter {
     projects = ["projects/${google_project.this.number}"]
 
-    # Считаем полную стоимость, без вычета кредитов: иначе на free trial
-    # траты почти нулевые и алерты не срабатывают
+    # Count the full cost without credits: otherwise on the free trial
+    # spend is close to zero and alerts never fire
     credit_types_treatment = "EXCLUDE_ALL_CREDITS"
   }
 
@@ -60,13 +60,13 @@ resource "google_billing_budget" "this" {
     }
   }
 
-  # Отдельно — прогноз: письмо придёт, если к концу месяца ожидается превышение
+  # Forecast rule: email if the month is expected to exceed the budget
   threshold_rules {
     threshold_percent = 1.0
     spend_basis       = "FORECASTED_SPEND"
   }
 
-  # Письма получают админы billing-аккаунта (по умолчанию — вы)
+  # Emails go to billing account admins (you, by default)
 
   depends_on = [google_project_service.seed]
 }
