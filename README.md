@@ -1,137 +1,103 @@
 # gcp-learning
 
-Hands-on project for the "Databases in GCP" course. Infrastructure is Terraform/Terragrunt,
-changes go through pull requests and are applied by GitHub Actions with a manual approval.
-No service account keys anywhere: CI signs in with Workload Identity Federation, people with
-service account impersonation.
+Hands-on project for the "Databases in GCP" course: a GCP project built the way production
+infrastructure is built. Terraform/Terragrunt, every change through a pull request, applied by
+GitHub Actions after manual approval, no service account keys.
 
-## Layout
+Setup from scratch: [docs/SETUP.md](docs/SETUP.md).
 
-| Path | What | Applied by |
+## What creates what
+
+| Folder | Resources | Applied by |
 |---|---|---|
-| `databases/module-0/` | Project, billing, budget, Terraform SAs, WIF (plain terraform) | Admin, locally, once |
-| `databases/module-1+/` | Course stacks (terragrunt) | CI; locally via impersonation |
-| `modules/` | Terraform modules used by the stacks (`source` in `terragrunt.hcl`) | - |
-| `root.hcl` | Shared google provider and GCS backend | - |
-| `mise.toml` | Pinned tool versions and tasks (`plan`, `apply`, `lint`, `format`) | - |
-| `.github/workflows/` | `lint.yml` and `plan.yml` on PRs, `apply.yml` after merge | - |
-| `renovate.json` | Weekly update PRs: providers, lock files, SHA-pinned actions, mise tools | - |
+| [`databases/module-0/0-seed`](databases/module-0/0-seed) | Project, billing link, budget alert | Admin, locally |
+| [`databases/module-0/1-bootstrap`](databases/module-0/1-bootstrap) | APIs, state bucket, `terraform-plan` / `terraform-apply` SAs, Workload Identity Federation, `db-bastion` SA and all project roles | Admin, locally |
+| [`databases/module-1/apis`](databases/module-1/apis) | Compute, Service Networking and IAP APIs | CI |
+| [`databases/module-1/network`](databases/module-1/network) | VPC `learning-vpc`, subnet `10.10.0.0/24` | CI |
+| [`databases/module-1/cloud-nat`](databases/module-1/cloud-nat) | Cloud Router + NAT: outbound internet for VMs without an external IP | CI |
+| [`databases/module-1/private-service-access`](databases/module-1/private-service-access) | Reserved range `10.20.0.0/20` + peering with Google services | CI |
+| [`databases/module-2/apis`](databases/module-2/apis) | Cloud SQL Admin and Secret Manager APIs | CI |
+| [`databases/module-2/cloud-sql-postgres`](databases/module-2/cloud-sql-postgres) | Cloud SQL PostgreSQL 17, private IP only, database `app`, postgres password in Secret Manager | CI |
+| [`databases/module-2/bastion`](databases/module-2/bastion) | VM `db-bastion` without an external IP, SSH through IAP, Cloud SQL Auth Proxy on `localhost:5432` | CI |
+| [`modules/`](modules) | Terraform code the stacks above call | - |
+| [`root.hcl`](root.hcl) | Shared provider and GCS state backend for all stacks | - |
+| [`.github/workflows/`](.github/workflows) | `lint` and `plan` on PRs, `apply` after merge | - |
 
-## How a change is applied
+## Dependencies
 
+Each stack reads the outputs of the one it depends on, so they are created top to bottom
+and destroyed bottom to top.
+
+```mermaid
+flowchart TD
+    seed["0-seed<br/>project, billing, budget"]
+    boot["1-bootstrap<br/>state bucket, SAs, WIF"]
+    apis["apis<br/>compute, servicenetworking, iap"]
+    vpc["network<br/>VPC + subnet 10.10.0.0/24"]
+    psa["private-service-access<br/>range 10.20.0.0/20 + peering"]
+    apis2["module-2 apis<br/>sqladmin, secretmanager"]
+    sql[("cloud-sql-postgres<br/>private IP from 10.20.0.0/20")]
+    nat["cloud-nat<br/>router + NAT"]
+    bastion["bastion<br/>VM, IAP SSH, Auth Proxy"]
+    db[("AlloyDB / Redis")]
+
+    seed --> boot
+    boot -->|"CI can sign in"| apis
+    apis --> vpc
+    vpc -->|network_id| psa
+    vpc -->|network_id| sql
+    psa -->|range_name| sql
+    apis2 --> sql
+    vpc --> nat
+    sql -->|connection_name| bastion
+    nat -->|apt| bastion
+    boot -->|db-bastion SA| bastion
+    psa -.->|next modules| db
+
+    classDef admin fill:#fde2e2,stroke:#c0392b
+    classDef ci fill:#e3f1fd,stroke:#2471a3
+    classDef planned stroke-dasharray: 5 5
+    class seed,boot admin
+    class apis,vpc,psa,apis2,sql,nat,bastion ci
+    class db planned
 ```
-branch -> PR -> lint.yml: fmt, tflint, trivy (required checks)
-             -> plan.yml: terragrunt plan as terraform-plan -> plan posted as a PR comment
-       -> merge to main -> apply.yml: plan -> approval in the "Production" environment
-                                     -> apply the same saved plan as terraform-apply
-```
 
-`databases/module-0` is excluded from plan/apply in CI: it creates the identities CI itself
-runs as, so an admin applies it locally.
+Red: applied by an admin locally. Blue: applied by CI. Dashed: next course modules.
 
-## Requirements
+## Connecting to Cloud SQL
 
-- A Google account with a billing account (the $300 free trial works).
-  An organization (Cloud Identity / Workspace) is recommended, not required.
-- A GitHub repository (fork or copy of this one) where you are an admin.
-- macOS/Linux with [mise](https://mise.jdx.dev) and the
-  [gcloud CLI](https://cloud.google.com/sdk/docs/install).
-  mise installs terraform, terragrunt, tflint and trivy at the pinned versions.
-
-## Setup
-
-### 1. Tools and sign-in
-
-`mise.toml` sets `CLOUDSDK_CONFIG` to `~/.config/gcloud-gcp-learning`, so inside this repo
-gcloud and Terraform use their own accounts and ADC. Signing in here does not touch the
-credentials you use for other projects, and leaving the folder switches back.
+The database has only a private IP. Access goes through the bastion VM:
 
 ```bash
-brew install mise
-echo 'eval "$(mise activate zsh)"' >> ~/.zshrc && exec zsh   # once per machine
-cd gcp-learning && mise trust && mise install
-
-echo $CLOUDSDK_CONFIG                 # must print ~/.config/gcloud-gcp-learning
-gcloud auth login                     # the Google account that owns GCP billing
-gcloud auth application-default login # same account: ADC for Terraform
-gcloud config list account            # check the active account
-gcloud billing accounts list          # billing account ID
-gcloud organizations list             # org ID, if you have one
+gcloud compute ssh db-bastion --zone europe-west2-a --tunnel-through-iap
+psql "host=127.0.0.1 dbname=app user=db-bastion@gcp-learning-bohdan88.iam"
 ```
 
-This personal sign-in is used only for `module-0` and for impersonation. CI never uses it:
-GitHub Actions gets short-lived tokens of `terraform-plan` / `terraform-apply` through WIF,
-and `1-bootstrap` allows that only for the repository set in `repo`.
+The Auth Proxy on the VM handles TLS and signs in as the VM's service account (IAM
+authentication, no password). Project owners have access; others need to be in
+`db_operators` in [1-bootstrap](databases/module-0/1-bootstrap). The `postgres` password is
+for emergencies only and is in Secret Manager (`learning-pg-postgres-password`).
 
-### 2. Project: `databases/module-0/0-seed`
-
-Creates the project, links billing and sets a budget alert. Runs with your own credentials.
+A new IAM user can connect but cannot create tables. Grant once as `postgres`, straight to
+the private IP (the proxy above signs in only with IAM):
 
 ```bash
-cd databases/module-0/0-seed
-cp terraform.tfvars.example terraform.tfvars   # project_id, billing_account, org_id
-terraform init && terraform apply
-gcloud auth application-default set-quota-project <project_id>
+psql "host=<private_ip> sslmode=require dbname=app user=postgres"
+```
+```sql
+GRANT CREATE ON SCHEMA public TO "db-bastion@gcp-learning-bohdan88.iam";
 ```
 
-### 3. Access: `databases/module-0/1-bootstrap`
+In production such grants live in the application's migrations, not done by hand.
 
-Creates the state bucket, the `terraform-plan` / `terraform-apply` SAs, WIF for GitHub
-and impersonation for you.
+## How a change gets applied
 
-```bash
-cd ../1-bootstrap
-cp terraform.tfvars.example terraform.tfvars   # project, repo, apply_environment, impersonators
-terraform init && terraform apply
+```mermaid
+flowchart LR
+    pr["PR"] --> lint["lint<br/>fmt, tflint, trivy"]
+    pr --> plan["plan<br/>as terraform-plan<br/>result in PR comment"]
+    lint --> merge["merge to main"]
+    plan --> merge
+    merge --> approve["approval in<br/>Production environment"]
+    approve --> apply["apply<br/>as terraform-apply"]
 ```
-
-### 4. Move both stages' state to the bucket
-
-```bash
-cp backend.tf.example backend.tf               # set the bucket name
-terraform init -migrate-state && rm terraform.tfstate*
-cd ../0-seed
-cp backend.tf.example backend.tf
-terraform init -migrate-state && rm terraform.tfstate*
-```
-
-### 5. Point the code at your project
-
-Set `project` and `region` in [root.hcl](root.hcl) and the SA emails in [mise.toml](mise.toml).
-
-### 6. GitHub settings
-
-| Where | Value |
-|---|---|
-| Settings -> Secrets and variables -> Actions -> **Variables** | `GCP_WORKLOAD_IDENTITY_PROVIDER`, `GCP_SA_PLAN`, `GCP_SA_APPLY` from `terraform output` in `1-bootstrap` |
-| Settings -> **Environments** -> `Production` | Required reviewers: you; Deployment branches: protected branches only; admin bypass off |
-| Settings -> **Rules** -> ruleset on `main` | Require a pull request; required checks `format`, `tflint`, `trivy`; block deletion and force push |
-| Settings -> Actions -> General | Workflow permissions: read-only; require approval for fork PRs |
-| Settings -> General -> Pull Requests | Squash merge only; automatically delete head branches |
-| Settings -> Advanced Security | Secret scanning with push protection; Dependabot alerts |
-| [Renovate GitHub App](https://github.com/apps/renovate) | Installed for this repository only |
-
-The environment name must match `apply_environment` in `1-bootstrap`: GCP issues the apply SA
-token only to jobs in that environment.
-
-### 7. Check
-
-Open a PR with any change under `databases/module-1`: lint and plan should pass and the plan
-appears as a comment. After merge, approve the deployment in the Actions run.
-
-## Local commands
-
-```bash
-mise run lint      # same checks as lint.yml
-mise run format    # terraform fmt + terragrunt hcl format
-mise run plan      # terragrunt plan for all stacks, as terraform-plan
-mise run apply     # terragrunt apply for all stacks, as terraform-apply
-```
-
-Local runs use your `gcloud` ADC and impersonate the same SAs as CI, so permissions match.
-
-## Costs
-
-`module-0` costs nothing beyond a few cents of storage. Destroy course stacks after practice
-(`terragrunt destroy` in the stack folder) so they do not burn credits. The project has
-`deletion_policy = "PREVENT"` and cannot be deleted by an accidental `terraform destroy`.

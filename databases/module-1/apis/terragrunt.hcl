@@ -10,5 +10,6 @@ inputs = {
   apis = [
     "compute.googleapis.com",
     "servicenetworking.googleapis.com", # Private Service Access for databases
+    "iap.googleapis.com",               # SSH to VMs without an external IP
   ]
 }

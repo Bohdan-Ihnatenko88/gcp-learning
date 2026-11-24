@@ -1,7 +1,7 @@
 # Module 0: project foundation
 
 Stages are applied in order. The lower the stage, the broader the permissions of whoever
-runs it and the less often it changes. Step-by-step setup is in the [root README](../../README.md).
+runs it and the less often it changes. Step-by-step setup is in [docs/SETUP.md](../../docs/SETUP.md).
 
 | Stage | Creates | Run by | State |
 |---|---|---|---|

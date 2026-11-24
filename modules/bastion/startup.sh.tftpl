@@ -1,0 +1,40 @@
+#!/bin/bash
+# Runs on every boot; installs only what is missing.
+set -euo pipefail
+
+if ! command -v psql >/dev/null; then
+  apt-get update
+  apt-get install -y postgresql-common
+  # Official PostgreSQL apt repository, for a client matching the server version
+  /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+  apt-get install -y "postgresql-client-${postgres_client_version}"
+fi
+
+if ! cloud-sql-proxy --version 2>/dev/null | grep -qF "${trimprefix(proxy_version, "v")}"; then
+  curl -fsSLo /tmp/cloud-sql-proxy \
+    "https://storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/${proxy_version}/cloud-sql-proxy.linux.amd64"
+  echo "${proxy_sha256}  /tmp/cloud-sql-proxy" | sha256sum -c -
+  install -m 0755 /tmp/cloud-sql-proxy /usr/local/bin/cloud-sql-proxy
+  rm /tmp/cloud-sql-proxy
+fi
+
+# Proxy as a service: localhost:5432 -> Cloud SQL private IP, TLS and IAM login
+# with the VM's service account
+cat >/etc/systemd/system/cloud-sql-proxy.service <<UNIT
+[Unit]
+Description=Cloud SQL Auth Proxy
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/local/bin/cloud-sql-proxy --private-ip --auto-iam-authn --address 127.0.0.1 --port 5432 ${instance_connection}
+Restart=always
+DynamicUser=yes
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+
+systemctl daemon-reload
+systemctl enable cloud-sql-proxy
+systemctl restart cloud-sql-proxy
