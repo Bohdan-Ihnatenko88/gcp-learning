@@ -1,5 +1,6 @@
 include "root" {
-  path = find_in_parent_folders("root.hcl")
+  path   = find_in_parent_folders("root.hcl")
+  expose = true
 }
 
 terraform {
@@ -41,6 +42,10 @@ inputs = {
   disk_size_gb      = 10
 
   databases = ["app"]
+
+  # Bastion VM signs in through the Auth Proxy with IAM, no password.
+  # The SA and its project roles are created in module-0/1-bootstrap.
+  iam_users = ["serviceAccount:db-bastion@${include.root.locals.project}.iam.gserviceaccount.com"]
 
   labels = {
     course = "databases"

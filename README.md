@@ -11,12 +11,14 @@ Setup from scratch: [docs/SETUP.md](docs/SETUP.md).
 | Folder | Resources | Applied by |
 |---|---|---|
 | [`databases/module-0/0-seed`](databases/module-0/0-seed) | Project, billing link, budget alert | Admin, locally |
-| [`databases/module-0/1-bootstrap`](databases/module-0/1-bootstrap) | APIs, state bucket, `terraform-plan` / `terraform-apply` SAs, Workload Identity Federation | Admin, locally |
-| [`databases/module-1/apis`](databases/module-1/apis) | Compute and Service Networking APIs | CI |
+| [`databases/module-0/1-bootstrap`](databases/module-0/1-bootstrap) | APIs, state bucket, `terraform-plan` / `terraform-apply` SAs, Workload Identity Federation, `db-bastion` SA and all project roles | Admin, locally |
+| [`databases/module-1/apis`](databases/module-1/apis) | Compute, Service Networking and IAP APIs | CI |
 | [`databases/module-1/network`](databases/module-1/network) | VPC `learning-vpc`, subnet `10.10.0.0/24` | CI |
+| [`databases/module-1/cloud-nat`](databases/module-1/cloud-nat) | Cloud Router + NAT: outbound internet for VMs without an external IP | CI |
 | [`databases/module-1/private-service-access`](databases/module-1/private-service-access) | Reserved range `10.20.0.0/20` + peering with Google services | CI |
 | [`databases/module-2/apis`](databases/module-2/apis) | Cloud SQL Admin and Secret Manager APIs | CI |
 | [`databases/module-2/cloud-sql-postgres`](databases/module-2/cloud-sql-postgres) | Cloud SQL PostgreSQL 17, private IP only, database `app`, postgres password in Secret Manager | CI |
+| [`databases/module-2/bastion`](databases/module-2/bastion) | VM `db-bastion` without an external IP, SSH through IAP, Cloud SQL Auth Proxy on `localhost:5432` | CI |
 | [`modules/`](modules) | Terraform code the stacks above call | - |
 | [`root.hcl`](root.hcl) | Shared provider and GCS state backend for all stacks | - |
 | [`.github/workflows/`](.github/workflows) | `lint` and `plan` on PRs, `apply` after merge | - |
@@ -30,11 +32,13 @@ and destroyed bottom to top.
 flowchart TD
     seed["0-seed<br/>project, billing, budget"]
     boot["1-bootstrap<br/>state bucket, SAs, WIF"]
-    apis["apis<br/>compute, servicenetworking"]
+    apis["apis<br/>compute, servicenetworking, iap"]
     vpc["network<br/>VPC + subnet 10.10.0.0/24"]
     psa["private-service-access<br/>range 10.20.0.0/20 + peering"]
     apis2["module-2 apis<br/>sqladmin, secretmanager"]
     sql[("cloud-sql-postgres<br/>private IP from 10.20.0.0/20")]
+    nat["cloud-nat<br/>router + NAT"]
+    bastion["bastion<br/>VM, IAP SSH, Auth Proxy"]
     db[("AlloyDB / Redis")]
 
     seed --> boot
@@ -44,17 +48,47 @@ flowchart TD
     vpc -->|network_id| sql
     psa -->|range_name| sql
     apis2 --> sql
+    vpc --> nat
+    sql -->|connection_name| bastion
+    nat -->|apt| bastion
+    boot -->|db-bastion SA| bastion
     psa -.->|next modules| db
 
     classDef admin fill:#fde2e2,stroke:#c0392b
     classDef ci fill:#e3f1fd,stroke:#2471a3
     classDef planned stroke-dasharray: 5 5
     class seed,boot admin
-    class apis,vpc,psa,apis2,sql ci
+    class apis,vpc,psa,apis2,sql,nat,bastion ci
     class db planned
 ```
 
 Red: applied by an admin locally. Blue: applied by CI. Dashed: next course modules.
+
+## Connecting to Cloud SQL
+
+The database has only a private IP. Access goes through the bastion VM:
+
+```bash
+gcloud compute ssh db-bastion --zone europe-west2-a --tunnel-through-iap
+psql "host=127.0.0.1 dbname=app user=db-bastion@gcp-learning-bohdan88.iam"
+```
+
+The Auth Proxy on the VM handles TLS and signs in as the VM's service account (IAM
+authentication, no password). Project owners have access; others need to be in
+`db_operators` in [1-bootstrap](databases/module-0/1-bootstrap). The `postgres` password is
+for emergencies only and is in Secret Manager (`learning-pg-postgres-password`).
+
+A new IAM user can connect but cannot create tables. Grant once as `postgres`, straight to
+the private IP (the proxy above signs in only with IAM):
+
+```bash
+psql "host=<private_ip> sslmode=require dbname=app user=postgres"
+```
+```sql
+GRANT CREATE ON SCHEMA public TO "db-bastion@gcp-learning-bohdan88.iam";
+```
+
+In production such grants live in the application's migrations, not done by hand.
 
 ## How a change gets applied
 

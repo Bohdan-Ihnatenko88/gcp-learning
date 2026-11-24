@@ -15,3 +15,7 @@ output "GCP_SA_APPLY" {
 output "tfstate_bucket" {
   value = google_storage_bucket.tfstate.name
 }
+
+output "db_bastion_sa" {
+  value = google_service_account.db_bastion.email
+}

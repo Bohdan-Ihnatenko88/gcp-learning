@@ -26,6 +26,7 @@ use the same SAs. Audit Logs show who used an SA.
 | `apis.tf` | Enabled APIs |
 | `state.tf` | State bucket (versioning, 30-day cleanup of old versions) and SA access to it |
 | `service_accounts.tf` | `terraform-plan`, `terraform-apply`, their roles, impersonation |
+| `workloads.tf` | Workload SAs with project roles (`db-bastion`) and `db_operators` access to the bastion |
 | `wif.tf` | WIF pool and provider, which GitHub jobs can become which SA |
 | `org_policy.tf` | Ban on JSON keys (only for a project in an organization) |
 
@@ -40,7 +41,8 @@ itself any role. Project roles change only here, in bootstrap.
    gcloud auth application-default set-quota-project <project_id>
    ```
 3. `cp terraform.tfvars.example terraform.tfvars`, set `project` (= `project_id` output of
-   0-seed), `repo`, `apply_environment` and yourself in `*_impersonators`.
+   0-seed), `repo`, `apply_environment` and yourself in `*_impersonators` (and `db_operators`
+   if you are not a project owner).
 4. Apply with local state:
    ```bash
    terraform init

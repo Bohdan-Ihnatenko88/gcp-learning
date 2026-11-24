@@ -71,3 +71,9 @@ variable "enforce_no_sa_keys" {
   type        = bool
   default     = false
 }
+
+variable "db_operators" {
+  description = "Who can SSH to the database bastion through IAP: user:... / group:... In production, a group"
+  type        = list(string)
+  default     = []
+}

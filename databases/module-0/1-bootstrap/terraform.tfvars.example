@@ -10,3 +10,6 @@ apply_impersonators = ["user:you@example.com"]
 # Inside an organization the key ban is already inherited from org policy (check:
 # gcloud resource-manager org-policies list --organization=<org_id>), so false
 enforce_no_sa_keys = false
+
+# SSH to the database bastion through IAP. Project owners have it anyway
+db_operators = ["user:you@example.com"]
